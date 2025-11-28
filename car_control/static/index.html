@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🤖 Contrôle Robot</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.9.0/nipplejs.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+        
+        /* Vidéo FPV en arrière-plan (landscape) */
+        #fpv-background {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 0;
+            display: none;
+        }
+        
+        /* Vidéo FPV au centre (portrait) */
+        #fpv-center {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+            max-width: 450px;
+            height: auto;
+            border: 3px solid #00d4ff;
+            border-radius: 16px;
+            z-index: 1;
+            display: none;
+            box-shadow: 0 0 40px rgba(0, 212, 255, 0.5);
+        }
+        
+        /* Overlay pour assombrir le fond en mode portrait FPV */
+        #fpv-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            z-index: 0;
+            display: none;
+        }
+        
+        /* Container principal avec z-index élevé */
+        .ui-container {
+            position: relative;
+            z-index: 10;
+        }
+        
+        /* Joysticks */
+        #joy_left, #joy_right {
+            width: 150px;
+            height: 150px;
+            position: fixed;
+            bottom: 40px;
+            touch-action: none;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            z-index: 100;
+            backdrop-filter: blur(15px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+        
+        #joy_left:active, #joy_right:active {
+            transform: scale(1.05);
+        }
+        
+        #joy_left {
+            left: 30px;
+        }
+        
+        #joy_right {
+            right: 30px;
+        }
+        
+        /* Panneau de contrôle */
+        .controls {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            padding: 15px;
+            max-width: 420px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+        
+        button {
+            padding: 12px 18px;
+            font-size: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        button.active {
+            background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+        
+        /* Status */
+        #status {
+            position: fixed;
+            bottom: 210px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 14px;
+            border: 2px solid #00d4ff;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            font-weight: 500;
+            box-shadow: 0 4px 20px rgba(0, 212, 255, 0.3);
+        }
+        
+        .status-connected {
+            border-color: #28a745;
+            color: #28a745;
+        }
+        
+        .status-disconnected {
+            border-color: #dc3545;
+            color: #dc3545;
+        }
+        
+        /* Labels joysticks */
+        .joy-label {
+            position: fixed;
+            bottom: 205px;
+            font-size: 13px;
+            color: #aaa;
+            font-weight: 600;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 6px 12px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #label-left {
+            left: 60px;
+        }
+        
+        #label-right {
+            right: 60px;
+        }
+        
+        /* Modal de configuration FPV */
+        #fpv-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+            padding: 35px;
+            border-radius: 20px;
+            z-index: 1000;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+            max-width: 90%;
+            width: 450px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        #fpv-modal h3 {
+            margin-bottom: 25px;
+            color: #00d4ff;
+            font-size: 22px;
+            text-align: center;
+        }
+        
+        #fpv-modal label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #bbb;
+            font-weight: 500;
+        }
+        
+        #fpv-modal input {
+            width: 100%;
+            padding: 14px;
+            margin-bottom: 20px;
+            border: 2px solid #444;
+            border-radius: 10px;
+            background: #1a1a1a;
+            color: white;
+            font-size: 15px;
+            transition: border-color 0.3s;
+        }
+        
+        #fpv-modal input:focus {
+            outline: none;
+            border-color: #00d4ff;
+        }
+        
+        #fpv-modal .modal-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 10px;
+        }
+        
+        #fpv-modal button {
+            flex: 1;
+        }
+        
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            z-index: 999;
+        }
+        
+        .hint {
+            font-size: 12px;
+            color: #888;
+            margin-top: -15px;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+        
+        /* Mode paysage (landscape) */
+        @media (orientation: landscape) {
+            .controls {
+                top: 15px;
+                grid-template-columns: repeat(4, 1fr);
+                max-width: 650px;
+                padding: 12px;
+            }
+            
+            button {
+                font-size: 13px;
+                padding: 10px 14px;
+            }
+            
+            #status {
+                bottom: auto;
+                top: 90px;
+            }
+            
+            .joy-label {
+                bottom: 210px;
+            }
+        }
+        
+        /* Petit écran portrait */
+        @media (max-width: 600px) and (orientation: portrait) {
+            .controls {
+                max-width: 90%;
+            }
+            
+            button {
+                font-size: 12px;
+                padding: 10px 12px;
+            }
+            
+            #joy_left, #joy_right {
+                width: 130px;
+                height: 130px;
+                bottom: 30px;
+            }
+            
+            #joy_left {
+                left: 20px;
+            }
+            
+            #joy_right {
+                right: 20px;
+            }
+        }
+        
+        /* Animations */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+        
+        .obstacle-warning {
+			position: fixed;
+			top: 20px;
+			left: 50%;
+			transform: translateX(-50%);
+			background: rgba(255, 59, 48, 0.95);
+			color: white;
+			padding: 15px 30px;
+			border-radius: 12px;
+			font-size: 18px;
+			font-weight: bold;
+			box-shadow: 0 4px 20px rgba(255, 59, 48, 0.5);
+			z-index: 10000;
+			backdrop-filter: blur(10px);
+			animation: pulse 1s infinite;
+			display: none;
+		}
+
+		.obstacle-warning.active {
+			display: block;
+		}
+
+		@keyframes pulse {
+			0%, 100% {
+				opacity: 1;
+				transform: translateX(-50%) scale(1);
+			}
+			50% {
+				opacity: 0.8;
+				transform: translateX(-50%) scale(1.05);
+			}
+		}
+
+		.obstacle-distance {
+			font-size: 24px;
+			margin-top: 5px;
+		}
+
+		.direction-suggestion {
+			position: fixed;
+			top: 100px;
+			left: 50%;
+			transform: translateX(-50%);
+			background: rgba(255, 149, 0, 0.95);
+			color: white;
+			padding: 12px 25px;
+			border-radius: 10px;
+			font-size: 16px;
+			z-index: 9999;
+			backdrop-filter: blur(10px);
+			display: none;
+		}
+
+		.direction-suggestion.active {
+			display: block;
+		}
+    </style>
+</head>
+<!-- Alertes d'obstacles -->
+<div id="obstacleWarning" class="obstacle-warning">
+    ⚠️ OBSTACLE DÉTECTÉ!
+    <div class="obstacle-distance" id="obstacleDistance"></div>
+</div>
+
+<div id="directionSuggestion" class="direction-suggestion">
+    💡 Suggestion: Reculez ou tournez pour éviter l'obstacle
+</div>
+<body>
+    <!-- Overlay pour mode portrait FPV -->
+    <div id="fpv-overlay"></div>
+    
+    <!-- Vidéo FPV en arrière-plan (landscape) -->
+    <img id="fpv-background" alt="FPV Stream">
+    
+    <!-- Vidéo FPV au centre (portrait) -->
+    <img id="fpv-center" alt="FPV Stream">
+    
+    <!-- Modal de configuration FPV -->
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div id="fpv-modal">
+        <h3>📹 Configuration Caméra FPV</h3>
+        
+        <label>📱 Adresse IP Android:</label>
+        <input type="text" id="fpv-ip" placeholder="ex: 192.168.1.100" value="">
+        <div class="hint">💡 Trouvez l'IP dans l'application IP Webcam</div>
+        
+        <label>🔌 Port:</label>
+        <input type="text" id="fpv-port" placeholder="ex: 8080" value="8080">
+        <div class="hint">💡 IP Webcam utilise le port 8080 par défaut</div>
+        
+        <div class="modal-buttons">
+            <button id="fpv-connect">📡 Connecter</button>
+            <button id="fpv-cancel">❌ Annuler</button>
+        </div>
+    </div>
+    
+    <div class="ui-container">
+        <!-- Panneau de contrôle -->
+        <div class="controls">
+            <button id="gyroToggle">📱 Gyro OFF</button>
+            <button id="fpvToggle">📹 FPV OFF</button>
+            <button id="invertXToggle">⬅➡ Inv OFF</button>
+            <button id="invertYToggle">⬆⬇ Inv OFF</button>
+        </div>
+        
+        <!-- Status de connexion -->
+        <p id="status" class="pulse">⏳ Connexion...</p>
+        
+        <!-- Joysticks -->
+        <div id="joy_left"></div>
+        <div id="joy_right"></div>
+        
+        <!-- Labels -->
+        <div id="label-left" class="joy-label">⬅➡ Virage</div>
+        <div id="label-right" class="joy-label">⬆⬇ Avance</div>
+    </div>
+    
+    <script src="/app.js"></script>
+</body>
+</html>

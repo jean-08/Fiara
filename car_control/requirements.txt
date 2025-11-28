@@ -1,0 +1,10 @@
+# Dépendances du projet Robot
+Flask==3.0.0
+flask-socketio==5.3.5
+python-socketio[client]==5.10.0
+gpiozero==2.0.1
+RPi.GPIO==0.7.1
+requests==2.31.0
+PyYAML==6.0.1
+gevent==23.9.1
+gevent-websocket==0.10.1

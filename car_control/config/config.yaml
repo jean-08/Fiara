@@ -1,0 +1,116 @@
+# ========================================
+# CONFIGURATION DU ROBOT
+# ========================================
+
+# === RÉSEAU ===
+network:
+  # IP du Raspberry Pi
+  raspberry_pi_ip: "192.168.182.41"
+  
+  # Port du serveur de contrôle (WebSocket)
+  control_port: 5007
+  
+  # Port du proxy caméra
+  camera_proxy_port: 5008
+  
+  # IP Android par défaut (IP Webcam)
+  default_android_ip: "192.168.182.32"
+  default_android_port: 8080
+
+# === SSL/TLS ===
+ssl:
+  # Chemins des certificats
+  cert_path: "/home/waw/certif/cert.pem"
+  key_path: "/home/waw/certif/key.pem"
+  
+  # Auto-générer les certificats s'ils n'existent pas
+  auto_generate: true
+
+# === GPIO (Moteurs) ===
+gpio:
+  # Moteur A (Avance/Recul)
+  motor_a:
+    enable_pin: 18    # PWM
+    input1_pin: 17    # Direction
+    input2_pin: 27    # Direction
+    max_speed: 0.5    # 0.0 à 1.0 
+    
+  # Moteur B (Virage)
+  motor_b:
+    enable_pin: 13    # PWM
+    input1_pin: 22    # Direction
+    input2_pin: 23    # Direction
+    max_speed: 0.5    # 0.0 à 1.0 (50%)
+
+# === CONTRÔLE ===
+control:
+  # Sensibilité du joystick (multiplicateur)
+  joystick_sensitivity: 1.0
+  
+  # Sensibilité du gyroscope
+  gyro_sensitivity: 1.0
+  
+  # Inversion des axes par défaut
+  invert_x: false
+  invert_y: false
+  
+  # Dead zone (zone morte du joystick)
+  dead_zone: 0.05
+
+# === CAMÉRA / FPV ===
+camera:
+  # Qualité du stream (1-100, plus bas = moins de latence)
+  jpeg_quality: 70
+  
+  # Résolution du stream (largeur x hauteur)
+  stream_width: 640
+  stream_height: 480
+  
+  # FPS cible
+  target_fps: 30
+  
+  # Timeout de connexion (secondes)
+  connection_timeout: 5
+  
+  # Buffer size pour le streaming
+  chunk_size: 4096
+
+# === LOGS ===
+logging:
+  # Niveau de log (DEBUG, INFO, WARNING, ERROR)
+  level: "INFO"
+  
+  # Fichier de log
+  file: "logs/robot.log"
+  
+  # Logs dans la console
+  console: true
+  
+  # Format des logs
+  format: "[%(asctime)s] %(levelname)s - %(message)s"
+  
+  # Rotation des logs
+  max_bytes: 10485760  # 10MB
+  backup_count: 3
+
+# === PERFORMANCE ===
+performance:
+  # Mode threadé pour Flask
+  threaded: true
+  
+  # Workers (si utilisation de gunicorn)
+  workers: 2
+  
+  # Async mode pour SocketIO
+  async_mode: "gevent"
+
+# === SÉCURITÉ ===
+security:
+  # CORS (autoriser toutes les origines)
+  cors_allowed_origins: "*"
+  
+  # Authentification (désactivée par défaut)
+  require_auth: false
+  
+  # Token d'authentification (si require_auth = true)
+  auth_token: ""
